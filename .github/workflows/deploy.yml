@@ -1,0 +1,79 @@
+name: Build firmware & deploy flasher
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false   # let deploys queue - avoid cancelling the Pages deployment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO & esptool
+        run: pip install --upgrade platformio "esptool~=4.8"
+
+      - name: Inject build version
+        run: |
+          VER=$(tr -d ' \t\n\r' < VERSION)
+          echo "VERSION=$VER" >> "$GITHUB_ENV"
+          echo "#define FW_VERSION_SEM \"$VER\"" > src/build_version.h
+          cat src/build_version.h
+
+      - name: Build firmware
+        run: pio run -e cyd
+
+      - name: Merge binaries into a single factory image
+        run: |
+          set -e
+          BUILD=.pio/build/cyd
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)
+          echo "boot_app0: $BOOT_APP0"
+          mkdir -p _site/firmware
+          python -m esptool --chip esp32 merge_bin \
+            -o _site/firmware/cyd-weather-merged.bin \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            0x1000  "$BUILD/bootloader.bin" \
+            0x8000  "$BUILD/partitions.bin" \
+            0xe000  "$BOOT_APP0" \
+            0x10000 "$BUILD/firmware.bin"
+
+      - name: Assemble site
+        run: |
+          set -e
+          cp web/index.html _site/index.html
+          cp -r docs _site/docs
+          sed "s/__VERSION__/${VERSION}/" web/manifest.json > _site/manifest.json
+          # App-only image for OTA (writes just the app partition, not the merged factory image)
+          cp .pio/build/cyd/firmware.bin _site/firmware/firmware.bin
+          # Semantic version string the device polls for OTA checks
+          printf '%s' "${VERSION}" > _site/version.txt
+          echo "Assembled _site:"; find _site -type f
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

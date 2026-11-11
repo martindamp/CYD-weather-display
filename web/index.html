@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CYD Weather – Web installer</title>
+  <style>
+    :root {
+      --bg: #0e1220;
+      --card: #171c2e;
+      --fg: #e9ecf2;
+      --muted: #9aa3b2;
+      --accent: #ffcb2d;
+      --line: #2a3048;
+      --warn: #e7a33e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+    main { width: 100%; max-width: 640px; }
+    .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #1a1500;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 999px;
+    }
+    h1 { font-size: 1.7rem; margin: 14px 0 4px; }
+    p.lead { color: var(--muted); margin-top: 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px;
+      margin: 20px 0;
+    }
+    .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .shots img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; }
+    .shots figure { margin: 0; }
+    .shots figcaption { color: var(--muted); font-size: .85rem; margin-top: 4px; text-align: center; }
+    .flash-row { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    esp-web-install-button[install-unsupported] { display: none; }
+    .unsupported {
+      display: none;
+      background: rgba(231,163,62,.12);
+      border: 1px solid var(--warn);
+      color: #f2c98a;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: .95rem;
+    }
+    esp-web-install-button[install-unsupported] ~ .unsupported { display: block; }
+    ol { padding-left: 20px; }
+    ol li { margin: 6px 0; }
+    .note {
+      font-size: .9rem;
+      color: var(--muted);
+      border-left: 3px solid var(--warn);
+      padding: 4px 0 4px 14px;
+      margin: 16px 0 0;
+    }
+    footer { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 24px; }
+    footer a { color: var(--accent); }
+    .ver { font-variant-numeric: tabular-nums; }
+    @media (max-width: 520px) { .shots { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="badge">ESP32-2432S028R</span>
+    <h1>CYD Weather — Web installer</h1>
+    <p class="lead">Current weather and a 5-day forecast for your favourite places on a Cheap Yellow Display. Install it straight from the browser — no Arduino IDE or PlatformIO needed.</p>
+
+    <div class="card">
+      <div class="flash-row">
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activate" style="
+            background: var(--accent); color:#1a1500; border:0;
+            font-weight:700; font-size:1rem; padding:12px 22px;
+            border-radius:10px; cursor:pointer;">
+            ⚡ Install CYD Weather
+          </button>
+        </esp-web-install-button>
+        <div class="unsupported">
+          Your browser does not support Web Serial. Use <strong>Chrome</strong> or <strong>Edge</strong> on a computer (not mobile).
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>How to</strong>
+      <ol>
+        <li>Open this page in <strong>Chrome</strong> or <strong>Edge</strong> on a computer.</li>
+        <li>Plug the CYD into USB.</li>
+        <li>Click <em>Install CYD Weather</em> and pick the serial port (CH340/CP2102).</li>
+        <li>When the install is done, the installer asks for your <strong>Wi-Fi</strong> — pick the network and enter the password.</li>
+        <li>Tap <strong>+ Add location</strong> on the screen, start typing a city and tap one of the suggestions.</li>
+        <li>Add more locations from the menu (☰ top right). With more than one, the pages rotate automatically — tap left/right to flip manually.</li>
+      </ol>
+      <p class="note">
+        Tip: the device also has its own web page at <code>http://&lt;device-ip&gt;/</code> (the IP is shown on the screen and in the menu),
+        where you can add, reorder and remove locations from your phone, change the rotation speed and update the firmware.
+        Wi-Fi can be changed any time by reconnecting here and choosing <em>Connect to Wi-Fi</em>.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="shots">
+        <figure><img src="docs/weather.png" alt="Weather page"><figcaption>Current weather + 5 days</figcaption></figure>
+        <figure><img src="docs/add-location.png" alt="Add location"><figcaption>Search with live suggestions</figcaption></figure>
+      </div>
+    </div>
+
+    <footer>
+      Build <span class="ver" id="ver">…</span> ·
+      <a href="https://github.com/martindamp/CYD-weather-display" target="_blank" rel="noopener">source on GitHub</a> ·
+      weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>
+    </footer>
+  </main>
+
+  <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js"></script>
+  <script>
+    fetch("manifest.json")
+      .then(r => r.json())
+      .then(m => { document.getElementById("ver").textContent = m.version || "unknown"; })
+      .catch(() => { document.getElementById("ver").textContent = "unknown"; });
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "CYD Weather",
+  "version": "__VERSION__",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "firmware/cyd-weather-merged.bin", "offset": 0 }
+      ]
+    }
+  ]
+}
