@@ -56,6 +56,8 @@ public:
   String substring(unsigned a, unsigned b = 0xFFFFFFFF) const { if (a > s.size()) return String(); return String(s.substr(a, b == 0xFFFFFFFF ? std::string::npos : b - a)); }
   bool endsWith(const String& x) const { return s.size() >= x.s.size() && s.compare(s.size() - x.s.size(), x.s.size(), x.s) == 0; }
   int indexOf(char c) const { auto p = s.find(c); return p == std::string::npos ? -1 : (int)p; }
+  int indexOf(const char* c) const { auto p = s.find(c); return p == std::string::npos ? -1 : (int)p; }
+  void replace(const String& a, const String& b) { size_t p = 0; while ((p = s.find(a.s, p)) != std::string::npos) { s.replace(p, a.s.size(), b.s); p += b.s.size(); } }
   long toInt() const { return atol(s.c_str()); }
   float toFloat() const { return atof(s.c_str()); }
   bool operator==(const String& o) const { return s == o.s; }

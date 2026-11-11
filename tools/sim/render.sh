@@ -14,8 +14,8 @@ g++ -std=gnu++17 -O1 -w -Imock -I"$LIB/U8g2_for_TFT_eSPI/src" -I"$LIB/ArduinoJso
 ./out/sim
 python3 - <<'PY'
 from PIL import Image
-for src, dst in [('2_weather','weather'),('3_weather2','weather-snow'),('6_add','add-location'),
-                 ('1_empty','empty'),('5_menu','menu'),('0_icons','icons')]:
+for src, dst in [('en_2_weather','weather'),('en_3_weather2','weather-snow'),('en_6_add','add-location'),
+                 ('en_1_empty','empty'),('en_5_menu','menu'),('da_2_weather','weather-da'),('0_icons','icons')]:
     im = Image.open('out/%s.ppm' % src)
     if dst != 'icons': im = im.resize((im.width*2, im.height*2), Image.NEAREST)
     im.save('../../docs/%s.png' % dst, optimize=True)

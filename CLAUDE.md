@@ -16,13 +16,18 @@ PlatformIO + Arduino. Everything (code, comments, UI) in English.
 - `src/main.cpp`: everything except icons and the device web page. Screens are an enum
   (`SCR_EMPTY`, `SCR_WEATHER`, `SCR_MENU`, `SCR_ADD`, ...); each `draw*()` sets `screen`.
 - `src/weather_icons.h`: vector icons per WMO code, drawn into a TFT_eSprite so the smooth
-  primitives blend with what's already drawn. Also `describe(code)`.
+  primitives blend with what's already drawn.
+- `src/i18n.h`: all on-screen text (en/da/de/fr): `tr(S_*)`, `trf(S_*, arg)` for one `%s`,
+  `trDow()`, `trWx(code)`. Never hard-code UI strings in main.cpp. The device web page has
+  its own `I18N` object in `web_page.h` with the same languages. Language is in NVS `wx/lang`
+  and is also sent as `language=` to the geocoding API. Check new strings fit with
+  `tools/sim/render.sh` (renders every language to `tools/sim/out/<lang>_*.ppm`).
 - `src/web_page.h`: device page at `http://<ip>/`; the browser calls Open-Meteo geocoding
   directly (CORS ok) and POSTs results to `/api/add`.
 - Data: Open-Meteo forecast + geocoding, no key. HTTPS without cert validation for weather
   (non-sensitive); OTA fetch is strictly cert-validated (`src/ota_certs.h`).
 - State in NVS (`Preferences`): namespace `wifi` (ssid/pass via Improv), `wx` (`locs` JSON,
-  `rotate`). Nothing secret in the repo or binary.
+  `rotate`, `lang`). Nothing secret in the repo or binary.
 - Weather fetch: one location per loop pass (`serviceWeather`), refresh 15 min, retry 30 s.
   Skipped while the menu/keyboard is open so typing isn't blocked.
 

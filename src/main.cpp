@@ -31,6 +31,7 @@
 #include <ImprovWiFiLibrary.h>
 #include "ota_certs.h"
 #include "weather_icons.h"
+#include "i18n.h"
 #include "web_page.h"
 
 // The semantic version is injected by GitHub Actions from the VERSION file.
@@ -55,7 +56,6 @@
 #define DEF_ROTATE_S   10
 #define FORECAST_DAYS  5
 #define MAX_SUGG       3
-#define GEO_LANG       "en"
 
 // ---- CYD resistive touch (XPT2046) on its own SPI bus ----
 #define XPT2046_IRQ   36
@@ -247,7 +247,6 @@ int dayOfWeek(int y, int m, int d) {
   if (m < 3) y -= 1;
   return (y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7;
 }
-static const char* DOW_NAMES[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
 // ============================ storage ============================
 void saveLocations() {
@@ -277,6 +276,7 @@ void loadSettings() {
   prefs.begin("wx", true);
   String s  = prefs.getString("locs", "[]");
   rotateSec = prefs.getInt("rotate", DEF_ROTATE_S);
+  g_lang    = langFromCode(prefs.getString("lang", "en"));
   prefs.end();
   if (rotateSec < 3 || rotateSec > 600) rotateSec = DEF_ROTATE_S;
 
@@ -304,6 +304,13 @@ void saveWiFi(const char* ssid, const char* pass) {
   prefs.end();
 }
 
+void saveLang(Lang l) {
+  g_lang = l;
+  prefs.begin("wx", false);
+  prefs.putString("lang", LANG_CODES[l]);
+  prefs.end();
+}
+
 void saveRotate(int s) {
   rotateSec = constrain(s, 3, 600);
   prefs.begin("wx", false);
@@ -313,7 +320,7 @@ void saveRotate(int s) {
 
 // Returns "" on success, otherwise an error message.
 String addLocation(const Location& L) {
-  if (nLocs >= MAX_LOCS) return "Maximum " + String(MAX_LOCS) + " locations";
+  if (nLocs >= MAX_LOCS) return "full";
   for (int i = 0; i < nLocs; i++) {
     if (fabsf(locs[i].lat - L.lat) < 0.01f && fabsf(locs[i].lon - L.lon) < 0.01f) {
       cur = i;                               // already there: just show it
@@ -434,7 +441,7 @@ void runSearch() {
   drawSuggestions();
 
   String url = "https://geocoding-api.open-meteo.com/v1/search?count=" + String(MAX_SUGG) +
-               "&language=" GEO_LANG "&format=json&name=" + urlEncode(q);
+               "&language=" + String(langCode()) + "&format=json&name=" + urlEncode(q);
   JsonDocument filter;
   JsonObject f = filter["results"][0].to<JsonObject>();
   f["name"] = true; f["latitude"] = true; f["longitude"] = true;
@@ -477,7 +484,7 @@ void drawMenuGlyph() {             // hamburger in the top-right corner
 
 // ============================ screens ============================
 String ipString() {
-  return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("offline");
+  return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String(tr(S_OFFLINE));
 }
 
 void drawMessage(const String& title, const String& l1, const String& l2 = "", const String& l3 = "") {
@@ -492,13 +499,13 @@ void drawMessage(const String& title, const String& l1, const String& l2 = "", c
 void drawNoWifi() {
   screen = SCR_NOWIFI;
   tft.fillScreen(C_BG);
-  text(SCR_W / 2, 52, "Connect to Wi-Fi", F_TITLE, C_TEXT, 1);
+  text(SCR_W / 2, 52, tr(S_CONNECT_WIFI), F_TITLE, C_TEXT, 1);
   if (wifiSsid.length()) {
-    text(SCR_W / 2, 80, fitText("Can't reach \"" + wifiSsid + "\" - retrying", 300, F_DETAIL), F_DETAIL, C_RED, 1);
+    text(SCR_W / 2, 80, fitText(trf(S_CANT_REACH, wifiSsid), 300, F_DETAIL), F_DETAIL, C_RED, 1);
   }
-  text(SCR_W / 2, 112, "Plug the CYD into a computer, open", F_DETAIL, C_DIM, 1);
-  text(SCR_W / 2, 130, "the web installer in Chrome or Edge", F_DETAIL, C_DIM, 1);
-  text(SCR_W / 2, 148, "and choose \"Connect to Wi-Fi\":", F_DETAIL, C_DIM, 1);
+  text(SCR_W / 2, 112, tr(S_WIFI_HELP1), F_DETAIL, C_DIM, 1);
+  text(SCR_W / 2, 130, tr(S_WIFI_HELP2), F_DETAIL, C_DIM, 1);
+  text(SCR_W / 2, 148, tr(S_WIFI_HELP3), F_DETAIL, C_DIM, 1);
   text(SCR_W / 2, 178, INSTALLER_URL, F_DAY, C_ACC, 1);
 }
 
@@ -507,11 +514,11 @@ void drawEmptyPage() {
   tft.fillScreen(C_BG);
   drawMenuGlyph();
   text(SCR_W / 2, 62, "CYD Weather", F_TITLE, C_TEXT, 1);
-  text(SCR_W / 2, 88, "No locations yet", F_BODY, C_DIM, 1);
+  text(SCR_W / 2, 88, tr(S_NO_LOCATIONS), F_BODY, C_DIM, 1);
   tft.fillSmoothRoundRect(60, 108, 200, 54, 12, C_ACC, C_BG);
-  text(SCR_W / 2, 142, "+  Add location", F_NAME, C_ACC_FG, 1, C_ACC);
+  text(SCR_W / 2, 142, fitText(tr(S_ADD_LOCATION_BTN), 188, F_NAME), F_NAME, C_ACC_FG, 1, C_ACC);
   if (WiFi.status() == WL_CONNECTED) {
-    text(SCR_W / 2, 198, "You can also add locations from a browser:", F_SMALL, C_DIM, 1);
+    text(SCR_W / 2, 198, tr(S_ALSO_BROWSER), F_SMALL, C_DIM, 1);
     text(SCR_W / 2, 216, "http://" + ipString() + "/", F_DAY, C_TEXT, 1);
   }
 }
@@ -520,7 +527,7 @@ void drawHeader() {
   const Location& L = locs[cur];
   const Weather&  W = wx[cur];
   String info;
-  if (WiFi.status() != WL_CONNECTED) info = "offline";
+  if (WiFi.status() != WL_CONNECTED) info = tr(S_OFFLINE);
   else if (W.valid && W.time[0]) info = String(W.time);
   if (nLocs > 1) info += (info.length() ? "   " : "") + String(cur + 1) + "/" + String(nLocs);
   int iw = info.length() ? textWidth(info, F_SMALL) : 0;
@@ -536,25 +543,33 @@ void drawWeatherPage() {
   drawHeader();
   const Weather& W = wx[cur];
   if (!W.valid) {
-    if (WiFi.status() != WL_CONNECTED) text(SCR_W / 2, 130, "Waiting for Wi-Fi...", F_BODY, C_DIM, 1);
-    else if (W.failed)                 text(SCR_W / 2, 130, "Couldn't get weather - retrying", F_BODY, C_DIM, 1);
-    else                               text(SCR_W / 2, 130, "Loading weather...", F_BODY, C_DIM, 1);
+    StrId m = (WiFi.status() != WL_CONNECTED) ? S_WAIT_WIFI : (W.failed ? S_WX_FAILED : S_WX_LOADING);
+    text(SCR_W / 2, 130, fitText(tr(m), SCR_W - 20, F_BODY), F_BODY, C_DIM, 1);
     return;
   }
 
   // ---- current weather ----
   drawIconAt(6, 34, 92, W.code, W.isDay);
   text(106, 80, tempStr(W.temp), F_TEMP, C_TEXT);
-  String desc = wicons::describe(W.code);
+  String desc = trWx(W.code);
   const uint8_t* df = textWidth(desc, F_DESC) > 206 ? F_DESC_S : F_DESC;
-  text(108, 104, desc, df, C_TEXT);
-  String det = "Feels " + tempStr(W.feels) + "    Wind " + String(lroundf(W.wind)) + " m/s";
-  String hum = "    " + String(W.hum) + "%";
-  bool showHum = textWidth(det + hum, F_DETAIL) <= 206;
-  if (showHum) det += hum;
-  text(108, 124, det, F_DETAIL, C_DIM);
+  text(108, 104, fitText(desc, 206, df), df, C_TEXT);
+  // "Feels x   Wind y m/s   hum%": tighten the gaps before dropping humidity.
+  String feels = String(tr(S_FEELS)) + " " + tempStr(W.feels);
+  String wind  = String(tr(S_WIND)) + " " + String(lroundf(W.wind)) + " m/s";
+  String humS  = String(W.hum) + "%";
+  String det; bool showHum = false;
+  for (const char* gap : {"    ", "   "}) {          // >= 3 spaces leaves room for the drop
+    det = feels + gap + wind + gap + humS;
+    if (textWidth(det, F_DETAIL) <= 206) { showHum = true; break; }
+  }
+  if (!showHum) {
+    det = feels + "    " + wind;
+    if (textWidth(det, F_DETAIL) > 206) det = feels + "  " + wind;
+  }
+  text(108, 124, fitText(det, 206, F_DETAIL), F_DETAIL, C_DIM);
   if (showHum) {                               // little drop in front of the humidity
-    int hx = 108 + textWidth(det, F_DETAIL) - textWidth(String(W.hum) + "%", F_DETAIL) - 7;
+    int hx = 108 + textWidth(det, F_DETAIL) - textWidth(humS, F_DETAIL) - 6;
     drawDrop(hx, 119, C_BLUE);
   }
 
@@ -566,7 +581,7 @@ void drawWeatherPage() {
     const DayFc& D = W.days[k];
     int x0 = k * colW, cx = x0 + colW / 2;
     if (k) tft.drawFastVLine(x0, 146, 86, C_LINE);
-    text(cx, 155, k == 0 ? String("Today") : String(DOW_NAMES[D.dow]), F_DAY, k == 0 ? C_ACC : C_TEXT, 1);
+    text(cx, 155, k == 0 ? String(tr(S_TODAY)) : String(trDow(D.dow)), F_DAY, k == 0 ? C_ACC : C_TEXT, 1);
     drawIconAt(cx - 21, 160, 42, D.code, true);
     String hi = tempStr(D.tmax), lo = tempStr(D.tmin);
     int wh = textWidth(hi, F_TMAX), wl = textWidth(lo, F_TMIN);
@@ -591,55 +606,58 @@ void showMain() {
 }
 
 // ---------------------------------------------------------------- menu
-enum MenuItem { MI_ADD, MI_REMOVE, MI_UPDATE, MI_CLOSE };
-MenuItem menuItems[4];
+enum MenuItem { MI_ADD, MI_REMOVE, MI_UPDATE, MI_LANG, MI_CLOSE };
+MenuItem menuItems[5];
 int      nMenu = 0;
-#define MENU_TOP  38
-#define MENU_ROWH 46
+#define MENU_TOP  36
+#define MENU_ROWH 39
 
 void drawMenu() {
   screen = SCR_MENU;
   tft.fillScreen(C_BG);
-  text(12, 26, "Menu", F_NAME, C_TEXT);
+  text(12, 25, tr(S_MENU), F_NAME, C_TEXT);
   nMenu = 0;
   menuItems[nMenu++] = MI_ADD;
   if (nLocs) menuItems[nMenu++] = MI_REMOVE;
   menuItems[nMenu++] = MI_UPDATE;
+  menuItems[nMenu++] = MI_LANG;
   menuItems[nMenu++] = MI_CLOSE;
   for (int i = 0; i < nMenu; i++) {
     int y = MENU_TOP + i * MENU_ROWH;
     String label; uint16_t col = C_TEXT;
     switch (menuItems[i]) {
       case MI_ADD:
-        label = nLocs >= MAX_LOCS ? "Add location (max reached)" : "+  Add location";
+        label = tr(nLocs >= MAX_LOCS ? S_ADD_MAX : S_ADD_LOCATION_BTN);
         if (nLocs >= MAX_LOCS) col = C_DIM;
         break;
       case MI_REMOVE:
-        label = removeArmed ? "Tap again to remove " + locs[cur].name : "Remove " + locs[cur].name;
+        label = trf(removeArmed ? S_REMOVE_CONFIRM : S_REMOVE, locs[cur].name);
         col = removeArmed ? C_RED : C_TEXT;
         break;
       case MI_UPDATE:
         switch (updState) {
-          case UPD_IDLE:      label = "Check for updates"; break;
-          case UPD_CHECKING:  label = "Checking..."; col = C_DIM; break;
-          case UPD_UPTODATE:  label = "Up to date (" FW_VERSION_SEM ")"; col = C_DIM; break;
-          case UPD_AVAILABLE: label = "Install update " + latestVer; col = C_ACC; break;
-          case UPD_FAIL:      label = "Couldn't reach GitHub - retry"; col = C_RED; break;
+          case UPD_IDLE:      label = tr(S_CHECK_UPD); break;
+          case UPD_CHECKING:  label = tr(S_CHECKING); col = C_DIM; break;
+          case UPD_UPTODATE:  label = trf(S_UP_TO_DATE, FW_VERSION_SEM); col = C_DIM; break;
+          case UPD_AVAILABLE: label = trf(S_INSTALL_UPD, latestVer); col = C_ACC; break;
+          case UPD_FAIL:      label = tr(S_GITHUB_FAIL); col = C_RED; break;
         }
         break;
-      case MI_CLOSE: label = "Close"; break;
+      case MI_LANG:  label = trf(S_LANGUAGE, LANG_NAMES[g_lang]); break;
+      case MI_CLOSE: label = tr(S_CLOSE); break;
     }
-    tft.fillSmoothRoundRect(8, y, SCR_W - 16, MENU_ROWH - 6, 8, C_PANEL, C_BG);
-    text(22, y + 26, fitText(label, SCR_W - 52, F_DESC), F_DESC, col, 0, C_PANEL);
+    tft.fillSmoothRoundRect(8, y, SCR_W - 16, MENU_ROWH - 5, 8, C_PANEL, C_BG);
+    text(22, y + 23, fitText(label, SCR_W - 52, F_DESC), F_DESC, col, 0, C_PANEL);
   }
-  String foot = String("v") + FW_VERSION_SEM + "   " + ipString() + "   Weather: Open-Meteo.com";
-  text(SCR_W / 2, 232, foot, F_SMALL, C_DIM, 1);
+  String foot = String("v") + FW_VERSION_SEM + "   " + ipString() + "   " + tr(S_WEATHER_BY);
+  text(SCR_W / 2, 236, foot, F_SMALL, C_DIM, 1);
 }
 
 void menuTap(int tx, int ty) {
   if (ty < MENU_TOP) { showMain(); return; }
   int i = (ty - MENU_TOP) / MENU_ROWH;
   if (i < 0 || i >= nMenu) { showMain(); return; }
+  if (menuItems[i] != MI_REMOVE) removeArmed = false;
   switch (menuItems[i]) {
     case MI_ADD:
       if (nLocs >= MAX_LOCS) return;
@@ -651,12 +669,15 @@ void menuTap(int tx, int ty) {
       showMain();
       return;
     case MI_UPDATE:
-      removeArmed = false;
       if (updState == UPD_AVAILABLE) { runOta(); return; }
       updState = UPD_CHECKING; drawMenu();
       latestVer = fetchLatestVersion();
       if (!latestVer.length()) updState = UPD_FAIL;
       else updState = (semverNum(latestVer) > semverNum(FW_VERSION_SEM)) ? UPD_AVAILABLE : UPD_UPTODATE;
+      drawMenu();
+      return;
+    case MI_LANG:                                 // cycle through the languages
+      saveLang((Lang)((g_lang + 1) % L_COUNT));
       drawMenu();
       return;
     case MI_CLOSE:
@@ -726,7 +747,9 @@ void drawKey(int r, int j, bool pressed) {
   tft.fillRect(x, y, w, h, C_BG);
   tft.fillSmoothRoundRect(x + 2, y + 2, w - 4, h - 4, 5, fill, C_BG);
   const uint8_t* f = (k.act == A_CHR) ? F_KEY : F_KEY_S;
-  text(x + w / 2, y + h / 2 + 5, k.up, f, fg, 1, fill);
+  const char* label = k.act == A_SPACE ? tr(S_KEY_SPACE) : k.act == A_DEL ? tr(S_KEY_DEL)
+                    : k.act == A_GO    ? tr(S_KEY_SEARCH) : k.up;
+  text(x + w / 2, y + h / 2 + 5, fitText(label, w - 8, f), f, fg, 1, fill);
 }
 
 void drawKeyboard() {
@@ -747,7 +770,7 @@ void drawInputField() {
   while (shown.length() && textWidth(shown, F_NAME) > maxW) utf8PopFront(shown);
   int w = 0;
   if (kbText.length()) w = text(56, 24, shown, F_NAME, C_TEXT, 0, C_PANEL);
-  else text(56, 23, "Search for a city or postcode", F_DETAIL, C_DIM, 0, C_PANEL);
+  else text(56, 23, fitText(tr(S_SEARCH_PH), maxW, F_DETAIL), F_DETAIL, C_DIM, 0, C_PANEL);
   tft.fillRect(56 + w + 2, 9, 2, 18, C_ACC);                         // cursor
 }
 
@@ -756,14 +779,14 @@ void drawSuggestions() {
   tft.fillRect(0, SUG_TOP - 2, SCR_W, KB_Y - SUG_TOP + 2, C_BG);
   const char* msg = nullptr;
   switch (sgState) {
-    case SG_HINT:      msg = "Type a place name - suggestions appear here"; break;
-    case SG_SEARCHING: msg = "Searching..."; break;
-    case SG_NONE:      msg = "No matches - check the spelling"; break;
-    case SG_ERROR:     msg = "Search failed - check Wi-Fi"; break;
-    case SG_FULL:      msg = "Maximum number of locations reached"; break;
+    case SG_HINT:      msg = tr(S_HINT); break;
+    case SG_SEARCHING: msg = tr(S_SEARCHING); break;
+    case SG_NONE:      msg = tr(S_NO_MATCH); break;
+    case SG_ERROR:     msg = tr(S_SEARCH_FAIL); break;
+    case SG_FULL:      msg = tr(S_FULL); break;
     case SG_RESULTS:   break;
   }
-  if (msg) { text(SCR_W / 2, SUG_TOP + 30, msg, F_DETAIL, C_DIM, 1); return; }
+  if (msg) { text(SCR_W / 2, SUG_TOP + 30, fitText(msg, SCR_W - 16, F_DETAIL), F_DETAIL, C_DIM, 1); return; }
   for (int i = 0; i < nSugg; i++) {
     int y = SUG_TOP + i * SUG_ROWH;
     tft.fillSmoothRoundRect(4, y, SCR_W - 8, SUG_ROWH - 2, 5, C_PANEL, C_BG);
@@ -957,7 +980,7 @@ void drawOtaProgress(int done, int total) {
 }
 
 void runOta() {
-  drawMessage("Updating firmware", "Don't unplug the display", "It restarts by itself when done");
+  drawMessage(tr(S_UPDATING), tr(S_DONT_UNPLUG), tr(S_RESTARTS));
   tft.fillRect(0, 115, SCR_W, 80, C_BG);
   Update.onProgress(drawOtaProgress);
   ensureTime();
@@ -965,8 +988,8 @@ void runOta() {
   sc.setCACert(OTA_ROOT_CAS);
   httpUpdate.rebootOnUpdate(true);
   t_httpUpdate_return r = httpUpdate.update(sc, OTA_BIN_URL);
-  if (r == HTTP_UPDATE_NO_UPDATES) drawMessage("Already up to date", "");
-  else drawMessage("Update failed", httpUpdate.getLastErrorString());
+  if (r == HTTP_UPDATE_NO_UPDATES) drawMessage(tr(S_ALREADY), "");
+  else drawMessage(tr(S_UPD_FAILED), httpUpdate.getLastErrorString());
   delay(4000);
   updState = UPD_IDLE;
   showMain();
@@ -991,6 +1014,9 @@ void handleState() {
   d["version"] = FW_VERSION_SEM;
   d["max"]     = MAX_LOCS;
   d["rotate"]  = rotateSec;
+  d["lang"]    = langCode();
+  JsonArray la = d["langs"].to<JsonArray>();
+  for (int i = 0; i < L_COUNT; i++) { JsonObject o = la.add<JsonObject>(); o["code"] = LANG_CODES[i]; o["name"] = LANG_NAMES[i]; }
   JsonArray a = d["locations"].to<JsonArray>();
   for (int i = 0; i < nLocs; i++) {
     JsonObject o = a.add<JsonObject>();
@@ -1007,7 +1033,7 @@ void handleAdd() {
   L.cc     = server.arg("cc");     L.cc.trim();
   L.lat    = server.arg("lat").toFloat();
   L.lon    = server.arg("lon").toFloat();
-  if (!L.name.length() || !server.hasArg("lat") || !server.hasArg("lon")) { sendOk("missing fields"); return; }
+  if (!L.name.length() || !server.hasArg("lat") || !server.hasArg("lon")) { sendOk("missing"); return; }
   if (L.name.length() > 60) L.name = L.name.substring(0, 60);
   if (L.region.length() > 60) L.region = L.region.substring(0, 60);
   String err = addLocation(L);
@@ -1019,6 +1045,7 @@ void handleRemove() { removeLocation(server.arg("i").toInt()); uiDirty = true; s
 void handleMove()   { moveLocation(server.arg("i").toInt(), server.arg("d").toInt()); uiDirty = true; sendOk(); }
 void handleSettings() {
   if (server.hasArg("rotate")) saveRotate(server.arg("rotate").toInt());
+  if (server.hasArg("lang"))   { saveLang(langFromCode(server.arg("lang"))); uiDirty = true; }
   lastSwitch = millis();
   sendOk();
 }
@@ -1102,7 +1129,7 @@ void setup() {
   wifiStartMs = millis();
   if (wifiSsid.length()) {
     WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
-    drawMessage("CYD Weather", "Connecting to " + wifiSsid + "...");
+    drawMessage("CYD Weather", trf(S_CONNECTING, wifiSsid));
   } else {
     drawNoWifi();
   }

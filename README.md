@@ -23,8 +23,9 @@ and survive restarts and OTA updates.
 | | |
 |---|---|
 | ![Add location](docs/add-location.png) | ![Menu](docs/menu.png) |
-| Type a place name and pick one of the live suggestions. Æ, Ø and Å are on the keyboard; `123` has digits (postcodes) and other accents. | Tap the header (☰) for the menu: add or remove a location, or check for firmware updates. |
+| Type a place name and pick one of the live suggestions. Æ, Ø and Å are on the keyboard; `123` has digits (postcodes) and other accents. | Tap the header (☰) for the menu: add or remove a location, check for firmware updates, or change the language. |
 
+- **Languages**: English, Danish, German and French. Change it under *Language* in the menu, or on the device web page. Weather descriptions, weekdays and place-name suggestions follow the language. Places you already added keep the name they were saved with.
 - **Several locations**: pages rotate every 10 s (configurable). Tap the left or right half of the screen to flip manually.
 - **Device web page**: open `http://<device-ip>/` (the IP is shown on the empty screen and in the menu). There you can add, reorder and remove locations from your phone, set the rotation speed, and update the firmware.
 - **OTA updates**: *Check for updates* in the menu (or on the web page) compares with `version.txt` on GitHub Pages and installs the new firmware over Wi-Fi.
@@ -41,6 +42,12 @@ From [Open-Meteo](https://open-meteo.com/): free for non-commercial use, no API 
 The icons are vector drawings (`src/weather_icons.h`), drawn anti-aliased on the device:
 
 ![Icons](docs/icons.png)
+
+### Adding a language
+
+All text is in `src/i18n.h` (device) and the `I18N` object in `src/web_page.h` (device web page). Add the language to `Lang`, `LANG_CODES` and `LANG_NAMES`, then add one column to each table. Only Latin-1 characters can be shown on the screen.
+
+![Danish](docs/weather-da.png)
 
 ## Build it yourself
 
